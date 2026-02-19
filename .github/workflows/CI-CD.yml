@@ -140,7 +140,7 @@ jobs:
           echo "Testing connectivity to EC2..."
           nc -zv ${{ secrets.EC2_HOST }} 22 -w 10 || echo "PORT 22 IS NOT REACHABLE"
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
-          
+
       - name: SSH into EC2 and deploy
         env:
           IMAGE_TAG:    ${{ needs.build-and-push.outputs.image_tag }}
@@ -149,31 +149,41 @@ jobs:
           ssh -i ~/.ssh/deploy_key.pem \
             -o StrictHostKeyChecking=no \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << ENDSSH
- 
-            set -e  # Exit on any error
- 
-            # 1. Authenticate Docker daemon to ECR
+            set -e
+
+            # 1. Authenticate Docker to ECR
             aws ecr get-login-password --region $AWS_REGION | \
-              docker login --username AWS \
-                          --password-stdin \
-                          ${{ env.ECR_REGISTRY }}
- 
-            # 2. Navigate to the app directory
+              docker login --username AWS --password-stdin \
+              ${{ env.ECR_REGISTRY }}
+
+            # 2. Create app directory if it doesn't exist
             mkdir -p /home/${{ secrets.EC2_USER }}/app
             cd /home/${{ secrets.EC2_USER }}/app
- 
-            # 3. Export variables for docker-compose substitution
+
+            # 3. Write docker-compose.yaml directly onto the server
+            cat > docker-compose.yaml << 'EOF'
+            version: '3.8'
+            services:
+              java-app:
+                image: ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
+                container_name: java-app
+                ports:
+                  - "8080:8080"
+                restart: unless-stopped
+            EOF
+
+            # 4. Export variables for docker-compose substitution
             export ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
             export ECR_REPO="${{ env.ECR_REPO }}"
             export IMAGE_TAG="$IMAGE_TAG"
- 
-            # 4. Pull new image and restart container
+
+            # 5. Pull new image and restart container
             docker-compose pull
             docker-compose up -d --remove-orphans
- 
-            # 5. Clean up dangling images to free disk space
+
+            # 6. Clean up old images
             docker image prune -f
- 
+
             echo "Deployment complete: $ECR_REPO:$IMAGE_TAG"
           ENDSSH
  
