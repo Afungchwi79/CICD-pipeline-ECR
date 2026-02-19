@@ -134,9 +134,13 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key.pem
           chmod 600 ~/.ssh/deploy_key.pem
-          # Add EC2 host to known_hosts to avoid interactive prompt
+
+      - name: Test EC2 reachability
+        run: |
+          echo "Testing connectivity to EC2..."
+          nc -zv ${{ secrets.EC2_HOST }} 22 -w 10 || echo "PORT 22 IS NOT REACHABLE"
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
- 
+          
       - name: SSH into EC2 and deploy
         env:
           IMAGE_TAG:    ${{ needs.build-and-push.outputs.image_tag }}
