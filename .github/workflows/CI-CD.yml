@@ -129,24 +129,24 @@ jobs:
     needs: build-and-push
 
     steps:
-      - name: Checkout source code
+      - name: Checkout source code        # ← MUST BE FIRST
         uses: actions/checkout@v4
 
-      - name: Write SSH private key to file
+      - name: Write SSH private key to file    # ← SECOND
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key.pem
           chmod 600 ~/.ssh/deploy_key.pem
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Copy docker-compose.yaml to EC2
+      - name: Copy docker-compose.yaml to EC2    # ← THIRD
         run: |
           scp -i ~/.ssh/deploy_key.pem \
             -o StrictHostKeyChecking=no \
             docker-compose.yaml \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/app/docker-compose.yaml
 
-      - name: SSH into EC2 and deploy
+      - name: SSH into EC2 and deploy        # ← FOURTH
         env:
           IMAGE_TAG:  ${{ needs.build-and-push.outputs.image_tag }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
